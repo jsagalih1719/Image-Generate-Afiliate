@@ -128,8 +128,8 @@
 
         function TikTokAffiliateStudio() {
             // STATE
-            const [apiKey, setApiKey] = useState(""); // API Key state
-            const [showApiModal, setShowApiModal] = useState(true); // Modal input key
+            const [apiKey, setApiKey] = useState("AIzaSyB5vgcO6MbQlj0r4lqB9y5B9EMgnzpOa20"); // API Key dimasukkan di sini
+            const [showApiModal, setShowApiModal] = useState(false); // Modal tidak perlu muncul lagi karena key sudah ada
 
             const audioRef = useRef(null);
             const [prompt, setPrompt] = useState('');
@@ -169,10 +169,15 @@
 
             // Check API Key
             useEffect(() => {
-                const storedKey = localStorage.getItem("gemini_api_key");
-                if (storedKey) {
-                    setApiKey(storedKey);
-                    setShowApiModal(false);
+                // Prioritaskan key yang di-hardcode, jika tidak ada baru cek localStorage
+                if (!apiKey) {
+                    const storedKey = localStorage.getItem("gemini_api_key");
+                    if (storedKey) {
+                        setApiKey(storedKey);
+                        setShowApiModal(false);
+                    } else {
+                        setShowApiModal(true);
+                    }
                 }
             }, []);
 
@@ -355,7 +360,10 @@
 
             const handleGenerateVideo = () => {
                 if (!generatedImage) return; setIsGeneratingVideo(true);
-                setTimeout(() => { setIsGeneratingVideo(false); setVideoMode(true); setIsPlaying(true); if(voiceUrl && audioRef.current) { audioRef.current.play(); setIsAudioPlaying(true); } }, 2000);
+                setTimeout(() => {
+                    setIsGeneratingVideo(false); setVideoMode(true); setIsPlaying(true);
+                    if (voiceUrl && audioRef.current) { audioRef.current.play(); setIsAudioPlaying(true); }
+                }, 2000);
             };
 
             const handleDownload = () => {
