@@ -16,11 +16,16 @@
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #52525b; }
         .animate-in { animation-duration: 0.5s; animation-fill-mode: both; }
         .fade-in { animation-name: fadeIn; }
+        .slide-in-from-bottom-4 { animation-name: slideInBottom; }
+        .slide-in-from-right-4 { animation-name: slideInRight; }
+        .slide-in-from-left-4 { animation-name: slideInLeft; }
         .zoom-in { animation-name: zoomIn; }
-        .slide-in-right { animation-name: slideInRight; }
+        
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideInBottom { from { transform: translateY(1rem); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes slideInRight { from { transform: translateX(1rem); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes slideInLeft { from { transform: translateX(-1rem); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         @keyframes zoomIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-        @keyframes slideInRight { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         
         /* Loading Overlay */
         #app-loading { position: fixed; inset: 0; background: #000; z-index: 9999; display: flex; justify-content: center; align-items: center; color: #00f2ea; font-family: sans-serif; transition: opacity 0.5s; }
@@ -61,10 +66,10 @@
             Sparkles, Video, Download, Play, Pause, Loader2, Upload, X, ImagePlus, 
             Zap, ScanEye, Copy, Type, ShoppingBag, TrendingUp, Mic, BarChart3, 
             User, Palette as PaletteIcon, Box, Smile, Plus, Trash2, Eye, Wand2, 
-            CheckCircle2, ClipboardPaste, Key
+            CheckCircle2, ClipboardPaste, Key, MinusCircle // Added MinusCircle here
         } from 'lucide-react';
 
-        // --- ERROR BOUNDARY (Untuk menangkap error biar gak blank hitam) ---
+        // --- ERROR BOUNDARY ---
         class ErrorBoundary extends Component {
             constructor(props) {
                 super(props);
@@ -128,8 +133,8 @@
 
         function TikTokAffiliateStudio() {
             // STATE
-            const [apiKey, setApiKey] = useState("AIzaSyB5vgcO6MbQlj0r4lqB9y5B9EMgnzpOa20"); // API Key dimasukkan di sini
-            const [showApiModal, setShowApiModal] = useState(false); // Modal tidak perlu muncul lagi karena key sudah ada
+            const [apiKey, setApiKey] = useState("AIzaSyB5vgcO6MbQlj0r4lqB9y5B9EMgnzpOa20"); 
+            const [showApiModal, setShowApiModal] = useState(false);
 
             const audioRef = useRef(null);
             const [prompt, setPrompt] = useState('');
@@ -169,7 +174,6 @@
 
             // Check API Key
             useEffect(() => {
-                // Prioritaskan key yang di-hardcode, jika tidak ada baru cek localStorage
                 if (!apiKey) {
                     const storedKey = localStorage.getItem("gemini_api_key");
                     if (storedKey) {
@@ -236,8 +240,8 @@
                     const reader = new FileReader();
                     reader.onloadend = () => {
                         setFunction(reader.result);
+                        setGeneratedImage(null);
                         if (setFunction === setProductImage) {
-                            setGeneratedImage(null); // Reset generated image so user sees product
                             const img = new Image(); img.src = reader.result;
                             img.onload = () => {
                                 const r = img.width / img.height;
