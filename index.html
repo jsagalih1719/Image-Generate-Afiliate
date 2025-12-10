@@ -60,7 +60,7 @@
         "imports": {
             "react": "https://esm.sh/react@18.2.0",
             "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
-            "lucide-react": "https://esm.sh/lucide-react@0.263.1"
+            "lucide-react": "https://esm.sh/lucide-react@0.344.0"
         }
     }
     </script>
@@ -710,7 +710,7 @@
                                 >
                                 <label htmlFor="product-upload" className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-xl transition-all cursor-pointer group bg-zinc-900 overflow-hidden ${isDraggingProduct ? 'border-[#00f2ea] bg-zinc-800' : 'border-zinc-700 hover:border-[#00f2ea] hover:bg-zinc-900/50'}`}>
                                     {productImage ? (
-                                    <div className="w-full h-full p-0 flex items-center justify-center bg-black/40"><img src={productImage} className="w-full h-full object-cover pointer-events-none"/></div>
+                                    <div className="w-full h-full p-2 flex items-center justify-center bg-black/40"><img src={productImage} className="w-full h-full object-contain pointer-events-none"/></div>
                                     ) : (
                                     <div className="flex flex-col items-center pointer-events-none"><Box className={`w-8 h-8 mb-2 ${isDraggingProduct ? 'text-[#00f2ea]' : 'text-zinc-500 group-hover:text-[#00f2ea]'}`}/><span className="text-xs text-zinc-400 font-medium">{isDraggingProduct ? 'Lepaskan Foto!' : 'Upload Foto Produk'}</span></div>
                                     )}
@@ -725,7 +725,7 @@
                                     <div className="absolute left-1/2 -top-3 -translate-x-1/2 z-10 bg-zinc-950 p-1 rounded-full border border-zinc-800 shadow-sm"><Plus size={12} className="text-zinc-500"/></div>
                                     <label htmlFor="ref-upload" className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-xl transition-all cursor-pointer group bg-zinc-900 overflow-hidden ${isDraggingRef ? 'border-[#ff0050] bg-zinc-800' : 'border-zinc-700 hover:border-[#ff0050] hover:bg-zinc-900/50'}`}>
                                     {refImage ? (
-                                        <div className="w-full h-full p-0 flex items-center justify-center bg-black/40"><img src={refImage} className="w-full h-full object-cover pointer-events-none"/></div>
+                                        <div className="w-full h-full p-2 flex items-center justify-center bg-black/40"><img src={refImage} className="w-full h-full object-contain pointer-events-none"/></div>
                                     ) : (
                                         <div className="flex flex-col items-center pointer-events-none">{renderRefIcon(referenceType)}<span className="text-xs text-zinc-400 font-medium">{isDraggingRef ? 'Lepaskan Foto!' : `Upload ${referenceType}`}</span></div>
                                     )}
