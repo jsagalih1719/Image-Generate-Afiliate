@@ -49,7 +49,7 @@
 </head>
 <body class="bg-black text-white overflow-hidden">
     
-    <!-- LOADING SCREEN (Akan hilang saat React siap) -->
+    <!-- LOADING SCREEN -->
     <div id="app-loading">
         <div class="text-center">
             <div class="spinner mb-4 mx-auto"></div>
@@ -66,7 +66,7 @@
             Sparkles, Video, Download, Play, Pause, Loader2, Upload, X, ImagePlus, 
             Zap, ScanEye, Copy, Type, ShoppingBag, TrendingUp, Mic, BarChart3, 
             User, Palette as PaletteIcon, Box, Smile, Plus, Trash2, Eye, Wand2, 
-            CheckCircle2, ClipboardPaste, Key, MinusCircle // Added MinusCircle here
+            CheckCircle2, ClipboardPaste, Key, MinusCircle 
         } from 'lucide-react';
 
         // --- ERROR BOUNDARY ---
@@ -133,7 +133,7 @@
 
         function TikTokAffiliateStudio() {
             // STATE
-            const [apiKey, setApiKey] = useState("AIzaSyB5vgcO6MbQlj0r4lqB9y5B9EMgnzpOa20"); 
+            const [apiKey, setApiKey] = useState("AIzaSyDBnGH5LaL19SM0vAYol6brYr_LOVrqZ6w"); // API KEY BARU
             const [showApiModal, setShowApiModal] = useState(false);
 
             const audioRef = useRef(null);
@@ -172,7 +172,7 @@
                 setTimeout(() => { if(loader) loader.style.display = 'none'; }, 500);
             }, []);
 
-            // Check API Key
+            // Check API Key (Use hardcoded key if available)
             useEffect(() => {
                 if (!apiKey) {
                     const storedKey = localStorage.getItem("gemini_api_key");
@@ -374,6 +374,7 @@
                 const link = document.createElement('a'); link.href = generatedImage; link.download = `tiktok_${Date.now()}.png`; document.body.appendChild(link); link.click(); document.body.removeChild(link);
             };
 
+            // RENDER UI
             return (
                 <div className="h-screen bg-black text-white font-sans flex flex-col relative overflow-hidden selection:bg-cyan-500/30">
                     <audio ref={audioRef} src={voiceUrl} onEnded={() => setIsAudioPlaying(false)} />
@@ -477,14 +478,18 @@
 
                             <div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
                                 {!showScriptPanel ? (
-                                    <div className="space-y-6 animate-in slide-in-from-right-4 fade-in">
+                                    <div className="space-y-6 animate-in slide-in-from-left-4 fade-in">
                                         <div className="space-y-2">
                                             <div className="flex justify-between items-center"><label className="text-xs font-bold text-zinc-500 uppercase">1. Mode Referensi</label><div className="flex gap-1">{refTypes.map(t => (<button key={t.id} onClick={() => setReferenceType(t.id)} title={t.label} className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold border transition-all ${referenceType === t.id ? 'bg-[#00f2ea]/20 border-[#00f2ea] text-[#00f2ea]' : 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:text-zinc-300'}`}>{renderRefIcon(t.id)} {t.label}</button>))}</div></div>
                                             
                                             {/* PRODUCT UPLOAD */}
                                             <div className={`relative transition-all ${isDraggingProduct ? 'scale-[1.02] ring-2 ring-[#00f2ea]' : ''}`} onDragOver={(e) => handleDragOver(e, setIsDraggingProduct)} onDragLeave={(e) => handleDragLeave(e, setIsDraggingProduct)} onDrop={(e) => handleDrop(e, setIsDraggingProduct, setProductImage)}>
                                                 <label htmlFor="product-upload" className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-xl transition-all cursor-pointer group bg-zinc-900 overflow-hidden ${isDraggingProduct ? 'border-[#00f2ea] bg-zinc-800' : 'border-zinc-700 hover:border-[#00f2ea] hover:bg-zinc-900/50'}`}>
-                                                    {productImage ? <div className="w-full h-full p-2 flex items-center justify-center bg-black/40"><img src={productImage} className="w-full h-full object-contain pointer-events-none"/></div> : <div className="flex flex-col items-center pointer-events-none"><Box className={`w-8 h-8 mb-2 ${isDraggingProduct ? 'text-[#00f2ea]' : 'text-zinc-500 group-hover:text-[#00f2ea]'}`}/><span className="text-xs text-zinc-400 font-medium">{isDraggingProduct ? 'Lepaskan Foto!' : 'Upload Foto Produk'}</span></div>}
+                                                    {productImage ? (
+                                                    <div className="w-full h-full p-2 flex items-center justify-center bg-black/40"><img src={productImage} className="w-full h-full object-contain pointer-events-none"/></div>
+                                                    ) : (
+                                                    <div className="flex flex-col items-center pointer-events-none"><Box className={`w-8 h-8 mb-2 ${isDraggingProduct ? 'text-[#00f2ea]' : 'text-zinc-500 group-hover:text-[#00f2ea]'}`}/><span className="text-xs text-zinc-400 font-medium">{isDraggingProduct ? 'Lepaskan Foto!' : 'Upload Foto Produk'}</span></div>
+                                                    )}
                                                 </label>
                                                 <input id="product-upload" type="file" className="hidden" accept="image/*" onChange={handleProductUpload} />
                                                 {productImage && <button onClick={() => {setProductImage(null); setGeneratedImage(null);}} className="absolute top-2 right-2 bg-black/60 hover:bg-red-500/90 backdrop-blur-md rounded-full p-1.5 text-white transition-colors z-10 border border-white/10"><Trash2 size={14}/></button>}
