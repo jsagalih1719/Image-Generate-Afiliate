@@ -1,0 +1,793 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Sparkles, 
+  Video, 
+  Download, 
+  Play, 
+  Pause, 
+  Loader2, 
+  Upload, 
+  X, 
+  ImagePlus, 
+  Zap, 
+  ScanEye, 
+  Copy,
+  Type,
+  ShoppingBag,
+  TrendingUp,
+  Mic,
+  BarChart3,
+  User,
+  Palette as PaletteIcon,
+  Box,
+  Smile,
+  Plus,
+  Trash2,
+  Eye,
+  Wand2,
+  CheckCircle2,
+  ClipboardPaste
+} from 'lucide-react';
+
+// --- HELPER: BASE64 PCM TO WAV CONVERTER ---
+const base64ToBlob = (base64) => {
+  const binaryString = window.atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes.buffer;
+};
+
+const pcmToWavUrl = (pcmData, sampleRate = 24000) => {
+  const header = new ArrayBuffer(44);
+  const view = new DataView(header);
+  const totalDataLen = pcmData.byteLength;
+  
+  const writeString = (view, offset, string) => {
+    for (let i = 0; i < string.length; i++) {
+      view.setUint8(offset + i, string.charCodeAt(i));
+    }
+  };
+
+  writeString(view, 0, 'RIFF');
+  view.setUint32(4, 36 + totalDataLen, true);
+  writeString(view, 8, 'WAVE');
+  writeString(view, 12, 'fmt ');
+  view.setUint32(16, 16, true); 
+  view.setUint16(20, 1, true); // PCM
+  view.setUint16(22, 1, true); // Mono
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true); 
+  view.setUint16(34, 16, true); // 16-bit
+  writeString(view, 36, 'data');
+  view.setUint32(40, totalDataLen, true);
+  
+  const blob = new Blob([header, pcmData], { type: 'audio/wav' });
+  return URL.createObjectURL(blob);
+};
+
+export default function TikTokAffiliateStudio() {
+  // --- REFS ---
+  const audioRef = useRef(null);
+
+  // --- STATE MANAGEMENT ---
+  const [prompt, setPrompt] = useState('');
+  
+  // DUAL REFERENCE STATE
+  const [productImage, setProductImage] = useState(null); // Slot 1: Produk
+  const [refImage, setRefImage] = useState(null);       // Slot 2: Model/Style
+  
+  // DRAG & DROP STATES
+  const [isDraggingProduct, setIsDraggingProduct] = useState(false);
+  const [isDraggingRef, setIsDraggingRef] = useState(false);
+
+  // SETTINGS
+  const [referenceType, setReferenceType] = useState('Product'); 
+  const [aspectRatio, setAspectRatio] = useState('9:16');
+  const [artStyle, setArtStyle] = useState('Aesthetic Studio');
+  const [scriptTone, setScriptTone] = useState('Racun TikTok (Hype)'); 
+  
+  // APP STATE
+  const [generatedImage, setGeneratedImage] = useState(null); 
+  const [generatedBatch, setGeneratedBatch] = useState([]); 
+  
+  const [isGeneratingImg, setIsGeneratingImg] = useState(false);
+  const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
+  const [isUpscaling, setIsUpscaling] = useState(false);
+  const [isGeneratingScript, setIsGeneratingScript] = useState(false);
+  const [isGeneratingVoice, setIsGeneratingVoice] = useState(false); 
+  const [isAnalyzingProduct, setIsAnalyzingProduct] = useState(false); 
+  
+  const [generatedScript, setGeneratedScript] = useState(null);
+  const [voiceUrl, setVoiceUrl] = useState(null); 
+  const [showScriptPanel, setShowScriptPanel] = useState(false);
+  const [showCompare, setShowCompare] = useState(false); 
+
+  const [videoMode, setVideoMode] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isAudioPlaying, setIsAudioPlaying] = useState(false);
+  const [error, setError] = useState(null);
+  
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  const apiKey = ""; 
+
+  // --- PRESETS ---
+  const styles = [
+    { id: 'Aesthetic Studio', label: 'Studio Minimalis', desc: 'Bersih, terang, background polos estetik', color: 'from-pink-500 to-rose-400' },
+    { id: 'Cozy Home', label: 'Cozy Home', desc: 'Suasana rumah hangat, kayu, soft lighting', color: 'from-orange-400 to-amber-500' },
+    { id: 'Luxury Showcase', label: 'Mewah & Elegan', desc: 'Gelap, emas, spotlight, premium feel', color: 'from-slate-700 to-slate-900' },
+    { id: 'Outdoor Lifestyle', label: 'Outdoor Alam', desc: 'Cahaya matahari, alam, fresh', color: 'from-green-500 to-emerald-600' },
+    { id: 'Neon Pop', label: 'Neon Viral', desc: 'Warna-warni kontras tinggi, Gen-Z style', color: 'from-purple-500 to-indigo-600' },
+    { id: 'Soft Pastel', label: 'Cewek Kue', desc: 'Warna pastel lembut, cute, dreamy', color: 'from-blue-300 to-pink-300' },
+  ];
+
+  const aspectRatios = [
+    { id: '9:16', label: '9:16 (TikTok)', icon: <div className="w-3 h-5 border-2 border-current rounded-sm bg-current"/> },
+    { id: '3:4', label: '3:4 (Portrait)', icon: <div className="w-3 h-4 border-2 border-current rounded-sm"/> },
+    { id: '1:1', label: '1:1 (Square)', icon: <div className="w-4 h-4 border-2 border-current rounded-sm"/> },
+    { id: '4:3', label: '4:3 (Photo)', icon: <div className="w-4 h-3 border-2 border-current rounded-sm"/> },
+    { id: '16:9', label: '16:9 (Wide)', icon: <div className="w-5 h-3 border-2 border-current rounded-sm"/> },
+  ];
+
+  const tones = [
+    'Racun TikTok (Hype)',
+    'Storytelling (Emosional)',
+    'Edukasi (Professional)',
+    'Review Jujur (Santai)',
+    'FOMO (Mendesak)'
+  ];
+
+  const refTypes = [
+    { id: 'Product', label: 'Hanya Produk' },
+    { id: 'Model', label: '+ Model/Pose' },
+    { id: 'Face', label: '+ Wajah' }, 
+    { id: 'Style', label: '+ Gaya' },
+  ];
+
+  const renderRefIcon = (type) => {
+    switch(type) {
+      case 'Product': return <Box size={14}/>;
+      case 'Model': return <User size={14}/>;
+      case 'Face': return <Smile size={14}/>;
+      case 'Style': return <PaletteIcon size={14}/>;
+      default: return <Box size={14}/>;
+    }
+  };
+
+  // --- ACTIONS ---
+
+  // NEW: Handle Paste Event (Ctrl+V)
+  useEffect(() => {
+    const handlePaste = (e) => {
+      const items = e.clipboardData.items;
+      for (const item of items) {
+        if (item.type.indexOf('image') !== -1) {
+          const blob = item.getAsFile();
+          const reader = new FileReader();
+          reader.onload = (event) => {
+             const base64 = event.target.result;
+             
+             // Smart Routing Logic
+             if (!productImage) {
+               // Priority 1: Fill Product if empty
+               setProductImage(base64);
+               analyzeProduct(base64);
+               // Also auto set ratio
+               const img = new Image();
+               img.src = base64;
+               img.onload = () => {
+                  const ratio = img.width / img.height;
+                  if (ratio > 1.6) setAspectRatio('16:9');
+                  else if (ratio > 1.2) setAspectRatio('4:3');
+                  else if (ratio >= 0.9) setAspectRatio('1:1');
+                  else if (ratio > 0.6) setAspectRatio('3:4');
+                  else setAspectRatio('9:16');
+               };
+             } else if (referenceType !== 'Product' && !refImage) {
+               // Priority 2: Fill Reference if mode is active & ref empty
+               setRefImage(base64);
+             } else {
+               // Priority 3: Replace Product (Main)
+               setProductImage(base64);
+               analyzeProduct(base64);
+             }
+          };
+          reader.readAsDataURL(blob);
+        }
+      }
+    };
+
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [productImage, refImage, referenceType]);
+
+  const analyzeProduct = async (base64Image) => {
+    setIsAnalyzingProduct(true);
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                { text: "Analyze this product image. Describe it briefly in 1 sentence for a sales prompt. Focus on visual details." },
+                { inlineData: { mimeType: "image/png", data: base64Image.split(',')[1] } }
+              ]
+            }]
+          }),
+        }
+      );
+      const result = await response.json();
+      const description = result.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (description) {
+        setPrompt(description.trim());
+      }
+    } catch (e) {
+      console.log("Auto-analyze failed");
+    } finally {
+      setIsAnalyzingProduct(false);
+    }
+  };
+
+  const processFile = (file, setFunction) => {
+    if (file && file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFunction(reader.result);
+        setGeneratedImage(null);
+        
+        if (setFunction === setProductImage) {
+           const img = new Image();
+           img.src = reader.result;
+           img.onload = () => {
+              const ratio = img.width / img.height;
+              if (ratio > 1.6) setAspectRatio('16:9');
+              else if (ratio > 1.2) setAspectRatio('4:3');
+              else if (ratio >= 0.9) setAspectRatio('1:1');
+              else if (ratio > 0.6) setAspectRatio('3:4');
+              else setAspectRatio('9:16');
+            };
+            analyzeProduct(reader.result);
+        }
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setError("Mohon upload file gambar (JPG/PNG)");
+    }
+  };
+
+  const handleProductUpload = (e) => processFile(e.target.files[0], setProductImage);
+  const handleRefUpload = (e) => processFile(e.target.files[0], setRefImage);
+
+  const handleDragOver = (e, setIsDragging) => { e.preventDefault(); setIsDragging(true); };
+  const handleDragLeave = (e, setIsDragging) => { e.preventDefault(); setIsDragging(false); };
+  const handleDrop = (e, setIsDragging, setFunction) => {
+    e.preventDefault(); setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) processFile(e.dataTransfer.files[0], setFunction);
+  };
+
+  const handleAudioPlay = () => {
+    if (audioRef.current) {
+      if (isAudioPlaying) audioRef.current.pause();
+      else audioRef.current.play();
+      setIsAudioPlaying(!isAudioPlaying);
+    }
+  };
+
+  const handleGenerateScript = async () => {
+    if (!prompt && !productImage) {
+      setError("Upload produk atau tulis nama produk dulu!");
+      return;
+    }
+    
+    setIsGeneratingScript(true);
+    setShowScriptPanel(true);
+    setError(null);
+    setVoiceUrl(null); 
+
+    try {
+      let promptText = `Peran: Expert TikTok Affiliate. Tugas: Script viral untuk "${prompt}". Tone: ${scriptTone}.
+      Format Output JSON (Wajib): 
+      { 
+        "viral_score": 90, 
+        "reason": "...", 
+        "hook": "...", 
+        "script_body": "Tulis paragraf narasi biasa (jangan pakai object/array/list)", 
+        "cta": "...", 
+        "hashtags": "..." 
+      }`;
+
+      let requestBody = {
+        contents: [{ parts: [{ text: promptText }] }],
+        generationConfig: { responseMimeType: "application/json" }
+      };
+
+      if (productImage) {
+        requestBody.contents[0].parts.push({ inlineData: { mimeType: "image/png", data: productImage.split(',')[1] } });
+      }
+
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestBody) }
+      );
+
+      const result = await response.json();
+      let scriptData = JSON.parse(result.candidates[0].content.parts[0].text);
+      
+      if (typeof scriptData.script_body !== 'string') {
+         if (Array.isArray(scriptData.script_body)) {
+            scriptData.script_body = scriptData.script_body
+              .map(item => item.voiceover || item.text || JSON.stringify(item))
+              .join(' ');
+         } else if (typeof scriptData.script_body === 'object') {
+            scriptData.script_body = scriptData.script_body.voiceover || JSON.stringify(scriptData.script_body);
+         } else {
+            scriptData.script_body = String(scriptData.script_body);
+         }
+      }
+      
+      setGeneratedScript(scriptData);
+
+    } catch (err) {
+      console.log("Script fallback", err);
+      setGeneratedScript({
+        viral_score: 85,
+        reason: "Produk trending.",
+        hook: "Jangan scroll dulu!",
+        script_body: "Produk ini wajib punya karena kualitasnya bagus banget.",
+        cta: "Cek keranjang kuning!",
+        hashtags: "#fyp #tiktokshop"
+      });
+    } finally {
+      setIsGeneratingScript(false);
+    }
+  };
+
+  const handleGenerateVoiceover = async () => {
+    if (!generatedScript) return;
+    setIsGeneratingVoice(true);
+    try {
+      const text = `${generatedScript.hook}. ${generatedScript.script_body}. ${generatedScript.cta}`;
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text }] }],
+            generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } } } }
+          }),
+        }
+      );
+      const result = await response.json();
+      const base64 = result.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+      if (base64) setVoiceUrl(pcmToWavUrl(base64ToBlob(base64)));
+    } catch (err) { setError("Gagal membuat suara."); } 
+    finally { setIsGeneratingVoice(false); }
+  };
+
+  const handleGenerateImage = async () => {
+    if (!prompt.trim() && !productImage) {
+      setError("Wajib upload foto produk!");
+      return;
+    }
+
+    setIsGeneratingImg(true);
+    setError(null);
+    setVideoMode(false);
+    setGeneratedImage(null);
+    setGeneratedBatch([]); 
+
+    const affiliatePrompt = `Product photography of ${prompt}. Style: ${artStyle}. Aspect Ratio: ${aspectRatio}. 4k.`;
+
+    try {
+      let newImages = [];
+
+      if (productImage || refImage) {
+        let contents = [];
+        let instructions = "";
+
+        if (productImage) {
+           contents.push({ inlineData: { mimeType: "image/png", data: productImage.split(',')[1] } });
+           instructions += "Image 1 is PRODUCT. Preserve details. ";
+        }
+
+        if (refImage && referenceType !== 'Product') {
+           contents.push({ inlineData: { mimeType: "image/png", data: refImage.split(',')[1] } });
+           if (referenceType === 'Model') instructions += "Image 2 is POSE reference. ";
+           else if (referenceType === 'Face') instructions += "Image 2 is FACE reference. ";
+           else if (referenceType === 'Style') instructions += "Image 2 is STYLE reference. ";
+        } else if (referenceType === 'Product') {
+           instructions += `Place product in ${artStyle} background. `;
+        }
+
+        const variations = [
+          `Variation 1: Professional shot. ${instructions}`,
+          `Variation 2: Close-up. ${instructions}`,
+          `Variation 3: Lifestyle shot. ${instructions}`,
+          `Variation 4: Creative angle. ${instructions}`
+        ];
+        
+        const fetchOne = async (inst) => {
+            const response = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${apiKey}`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  contents: [
+                    ...contents.map(c => ({ role: "user", parts: [c] })),
+                    { role: "user", parts: [{ text: `${inst} ${affiliatePrompt}` }] }
+                  ],
+                  generationConfig: { responseModalities: ["TEXT", "IMAGE"] }
+                }),
+              }
+            );
+            const result = await response.json();
+            const b64 = result.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
+            return b64 ? `data:image/png;base64,${b64}` : null;
+        };
+
+        const results = await Promise.all(variations.map(v => fetchOne(v)));
+        newImages = results.filter(img => img !== null);
+
+      } else {
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              instances: [{ prompt: affiliatePrompt }],
+              parameters: { sampleCount: 4, aspectRatio: aspectRatio }
+            }),
+          }
+        );
+        const result = await response.json();
+        if (result.predictions) newImages = result.predictions.map(p => `data:image/png;base64,${p.bytesBase64Encoded}`);
+      }
+
+      if (newImages.length > 0) {
+        setGeneratedBatch(newImages); 
+        setGeneratedImage(newImages[0]); 
+        if (!generatedScript) handleGenerateScript();
+      } else { throw new Error("Gagal generate."); }
+    } catch (err) { setError("Gagal generate visual."); } 
+    finally { setIsGeneratingImg(false); }
+  };
+
+  const handleUpscale = async () => {
+    if (!generatedImage) return;
+    setIsUpscaling(true);
+    setVideoMode(false);
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: "Upscale to 4K. Sharpen details." }, { inlineData: { mimeType: "image/png", data: generatedImage.split(',')[1] } }] }],
+            generationConfig: { responseModalities: ["TEXT", "IMAGE"] }
+          }),
+        }
+      );
+      const result = await response.json();
+      const b64 = result.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
+      if (b64) {
+        const newImg = `data:image/png;base64,${b64}`;
+        setGeneratedImage(newImg);
+        setGeneratedBatch([newImg]); 
+      }
+    } catch (err) { setError("Upscale gagal"); } 
+    finally { setIsUpscaling(false); }
+  };
+
+  const handleGenerateVideo = () => {
+    if (!generatedImage) return;
+    setIsGeneratingVideo(true);
+    setTimeout(() => {
+      setIsGeneratingVideo(false);
+      setVideoMode(true);
+      setIsPlaying(true);
+      if(voiceUrl && audioRef.current) {
+        audioRef.current.play();
+        setIsAudioPlaying(true);
+      }
+    }, 2000); 
+  };
+
+  const handleDownload = () => {
+    if (!generatedImage) return;
+    const link = document.createElement('a');
+    link.href = generatedImage;
+    link.download = `tiktok_affiliate_${Date.now()}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // --- UI RENDER ---
+  return (
+    <div className="h-screen bg-black text-white font-sans flex flex-col selection:bg-cyan-500/30 selection:text-cyan-100 relative overflow-hidden">
+      
+      <audio ref={audioRef} src={voiceUrl} onEnded={() => setIsAudioPlaying(false)} />
+
+      {/* BACKGROUND */}
+      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] bg-[#00f2ea]/10 rounded-full blur-[120px] animate-pulse"></div>
+        <div className="absolute bottom-[-10%] left-[-10%] w-[50%] h-[50%] bg-[#ff0050]/10 rounded-full blur-[120px] animate-pulse delay-1000"></div>
+      </div>
+
+      {/* TOP BAR */}
+      <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center z-30 bg-black/20 backdrop-blur-md border-b border-white/5">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-gradient-to-br from-[#00f2ea] to-[#ff0050] rounded-lg flex items-center justify-center text-black shadow-[0_0_15px_rgba(0,242,234,0.5)]">
+            <ShoppingBag className="w-5 h-5" />
+          </div>
+          <h1 className="font-bold text-lg tracking-tight flex items-center gap-1">Affiliate AI <span className="text-[10px] bg-white text-black px-1.5 py-0.5 rounded font-bold">ULTIMATE</span></h1>
+        </div>
+        <div className="flex bg-zinc-900/80 p-1 rounded-lg border border-zinc-800 gap-1 overflow-x-auto max-w-[50vw] custom-scrollbar">
+           {aspectRatios.map(r => (
+             <button key={r.id} onClick={() => setAspectRatio(r.id)} className={`flex items-center gap-2 px-3 py-1.5 rounded-md transition-all whitespace-nowrap text-xs font-medium ${aspectRatio === r.id ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}>
+               {r.icon} <span>{r.id}</span>
+             </button>
+           ))}
+        </div>
+      </div>
+
+      {/* WORKSPACE */}
+      <div className="flex-1 flex overflow-hidden pt-16">
+        
+        {/* PREVIEW CANVAS */}
+        <div className="flex-1 relative flex items-center justify-center bg-black/50 overflow-hidden">
+           
+           {/* Empty State */}
+           {(!generatedImage && !isGeneratingImg && !isUpscaling && !productImage) && (
+              <div className="text-center space-y-4 max-w-md animate-in fade-in zoom-in duration-500">
+                 <div className="w-32 h-48 mx-auto border-2 border-dashed border-zinc-700 rounded-xl flex flex-col items-center justify-center bg-zinc-900/50">
+                    <ClipboardPaste className="w-8 h-8 text-zinc-600 mb-2"/>
+                    <span className="text-xs text-zinc-500 px-4">Drag & Drop atau Paste (Ctrl+V)</span>
+                 </div>
+                 <div>
+                   <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-[#00f2ea] to-[#ff0050]">Dominasi FYP.</h2>
+                   <p className="text-zinc-400 text-sm mt-2">Upload produk, AI akan otomatis menganalisa & membuat konten.</p>
+                 </div>
+              </div>
+           )}
+
+           {/* Loading State */}
+           {(isGeneratingImg || isUpscaling) && (
+              <div className="flex flex-col items-center">
+                 <Loader2 className="w-10 h-10 text-[#00f2ea] animate-spin mb-4"/>
+                 <p className="text-zinc-300 text-sm font-medium animate-pulse">{isUpscaling ? 'HD Upscaling...' : 'Meracik Visual...'}</p>
+              </div>
+           )}
+
+           {/* Main Display */}
+           {(generatedImage || productImage) && !isGeneratingImg && !isUpscaling && (
+             <div className="relative h-full w-full flex items-center justify-center p-4 overflow-hidden">
+               {/* Main Image */}
+               <img 
+                 src={showCompare && productImage ? productImage : (generatedImage || productImage)} 
+                 className={`w-full h-full object-contain rounded-lg border border-zinc-800 shadow-2xl transition-transform duration-500 ${videoMode && isPlaying ? 'scale-105 duration-[10s]' : 'scale-100'}`} 
+                 alt="Result"
+               />
+               
+               {/* Video Play Overlay */}
+               {videoMode && generatedImage && (
+                 <div className="absolute inset-0 flex items-center justify-center bg-black/20 z-10 pointer-events-none">
+                    <div className="absolute right-4 bottom-20 flex flex-col gap-4 items-center animate-in slide-in-from-right-4 fade-in">
+                       <div className="w-10 h-10 bg-zinc-800 rounded-full flex items-center justify-center border border-white/10"><div className="w-6 h-6 bg-red-500 rounded-full"></div></div>
+                       <div className="text-white text-xs drop-shadow-md">88.2K</div>
+                       <div className="text-white text-xs drop-shadow-md">Share</div>
+                    </div>
+                    {!isPlaying && <Play className="w-16 h-16 text-white/80 fill-white/20 backdrop-blur-sm rounded-full p-2"/>}
+                 </div>
+               )}
+
+               {/* Compare Button */}
+               {generatedImage && productImage && (
+                 <button 
+                    onMouseDown={() => setShowCompare(true)}
+                    onMouseUp={() => setShowCompare(false)}
+                    onMouseLeave={() => setShowCompare(false)}
+                    onTouchStart={() => setShowCompare(true)}
+                    onTouchEnd={() => setShowCompare(false)}
+                    className="absolute bottom-6 right-6 bg-black/60 backdrop-blur-md px-4 py-2 rounded-full text-xs font-bold text-white border border-white/20 shadow-lg hover:bg-black/80 transition-all select-none active:scale-95 flex items-center gap-2"
+                 >
+                    <Eye size={14}/> Tahan: Bandingkan
+                 </button>
+               )}
+             </div>
+           )}
+
+           {/* Batch Selector */}
+           {generatedBatch.length > 1 && !isGeneratingImg && (
+             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 p-2 bg-black/80 backdrop-blur-md rounded-xl border border-zinc-800 z-20">
+               {generatedBatch.map((img, idx) => (
+                 <button key={idx} onClick={() => { setGeneratedImage(img); setVideoMode(false); }} className={`w-10 h-10 rounded-lg overflow-hidden border-2 transition-all ${generatedImage === img ? 'border-[#00f2ea] scale-110' : 'border-transparent opacity-60 hover:opacity-100'}`}>
+                   <img src={img} className="w-full h-full object-cover"/>
+                 </button>
+               ))}
+             </div>
+           )}
+        </div>
+
+        {/* SIDEBAR CONTROLS */}
+        <div className="w-[400px] bg-zinc-950 border-l border-zinc-800 flex flex-col z-20 shadow-2xl">
+           <div className="flex border-b border-zinc-800">
+              <button onClick={() => setShowScriptPanel(false)} className={`flex-1 py-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${!showScriptPanel ? 'text-[#00f2ea] border-b-2 border-[#00f2ea] bg-zinc-900/50' : 'text-zinc-500 hover:text-white'}`}>
+                <ImagePlus size={16}/> Visual Studio
+              </button>
+              <button onClick={() => { if(generatedImage) handleGenerateScript(); else setShowScriptPanel(true); }} className={`flex-1 py-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${showScriptPanel ? 'text-[#ff0050] border-b-2 border-[#ff0050] bg-zinc-900/50' : 'text-zinc-500 hover:text-white'}`}>
+                <Mic size={16}/> Voice & Script
+              </button>
+           </div>
+
+           <div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
+              {!showScriptPanel ? (
+                <div className="space-y-6 animate-in slide-in-from-left-4 fade-in">
+                  
+                  {/* Mode & Uploads */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                       <label className="text-xs font-bold text-zinc-500 uppercase">1. Mode Referensi</label>
+                       <div className="flex gap-1">
+                          {refTypes.map(t => (
+                             <button key={t.id} onClick={() => setReferenceType(t.id)} title={t.label} className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold border transition-all ${referenceType === t.id ? 'bg-[#00f2ea]/20 border-[#00f2ea] text-[#00f2ea]' : 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:text-zinc-300'}`}>
+                                {renderRefIcon(t.id)} {t.label}
+                             </button>
+                          ))}
+                       </div>
+                    </div>
+                    
+                    {/* Slot 1: Product */}
+                    <div 
+                      className={`relative transition-all ${isDraggingProduct ? 'scale-[1.02] ring-2 ring-[#00f2ea]' : ''}`}
+                      onDragOver={(e) => handleDragOver(e, setIsDraggingProduct)}
+                      onDragLeave={(e) => handleDragLeave(e, setIsDraggingProduct)}
+                      onDrop={(e) => handleDrop(e, setIsDraggingProduct, setProductImage)}
+                    >
+                      <label htmlFor="product-upload" className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-xl transition-all cursor-pointer group bg-zinc-900 overflow-hidden ${isDraggingProduct ? 'border-[#00f2ea] bg-zinc-800' : 'border-zinc-700 hover:border-[#00f2ea] hover:bg-zinc-900/50'}`}>
+                        {productImage ? (
+                          <div className="w-full h-full p-0 flex items-center justify-center bg-black/40"><img src={productImage} className="w-full h-full object-cover pointer-events-none"/></div>
+                        ) : (
+                          <div className="flex flex-col items-center pointer-events-none"><Box className={`w-8 h-8 mb-2 ${isDraggingProduct ? 'text-[#00f2ea]' : 'text-zinc-500 group-hover:text-[#00f2ea]'}`}/><span className="text-xs text-zinc-400 font-medium">{isDraggingProduct ? 'Lepaskan Foto!' : 'Upload Foto Produk'}</span></div>
+                        )}
+                      </label>
+                      <input id="product-upload" type="file" className="hidden" accept="image/*" onChange={handleProductUpload} />
+                      {productImage && <button onClick={() => {setProductImage(null); setGeneratedImage(null);}} className="absolute top-2 right-2 bg-black/60 hover:bg-red-500/90 backdrop-blur-md rounded-full p-1.5 text-white transition-colors z-10 border border-white/10"><Trash2 size={14}/></button>}
+                    </div>
+
+                    {/* Slot 2: Reference */}
+                    {referenceType !== 'Product' && (
+                      <div className={`relative mt-2 animate-in slide-in-from-top-2 fade-in transition-all ${isDraggingRef ? 'scale-[1.02] ring-2 ring-[#ff0050]' : ''}`} onDragOver={(e) => handleDragOver(e, setIsDraggingRef)} onDragLeave={(e) => handleDragLeave(e, setIsDraggingRef)} onDrop={(e) => handleDrop(e, setIsDraggingRef, setRefImage)}>
+                        <div className="absolute left-1/2 -top-3 -translate-x-1/2 z-10 bg-zinc-950 p-1 rounded-full border border-zinc-800 shadow-sm"><Plus size={12} className="text-zinc-500"/></div>
+                        <label htmlFor="ref-upload" className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-xl transition-all cursor-pointer group bg-zinc-900 overflow-hidden ${isDraggingRef ? 'border-[#ff0050] bg-zinc-800' : 'border-zinc-700 hover:border-[#ff0050] hover:bg-zinc-900/50'}`}>
+                          {refImage ? (
+                            <div className="w-full h-full p-0 flex items-center justify-center bg-black/40"><img src={refImage} className="w-full h-full object-cover pointer-events-none"/></div>
+                          ) : (
+                            <div className="flex flex-col items-center pointer-events-none">{renderRefIcon(referenceType)}<span className="text-xs text-zinc-400 font-medium">{isDraggingRef ? 'Lepaskan Foto!' : `Upload ${referenceType}`}</span></div>
+                          )}
+                        </label>
+                        <input id="ref-upload" type="file" className="hidden" accept="image/*" onChange={handleRefUpload} />
+                        {refImage && <button onClick={() => setRefImage(null)} className="absolute top-2 right-2 bg-black/60 hover:bg-red-500/90 backdrop-blur-md rounded-full p-1.5 text-white transition-colors z-10 border border-white/10"><Trash2 size={14}/></button>}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Auto-Prompt */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                       <label className="text-xs font-bold text-zinc-500 uppercase">2. Deskripsi Detail</label>
+                       {isAnalyzingProduct && <span className="text-[10px] text-[#00f2ea] animate-pulse flex items-center gap-1"><Wand2 size={10}/> AI Menganalisa...</span>}
+                    </div>
+                    <textarea 
+                      value={prompt} 
+                      onChange={(e) => setPrompt(e.target.value)} 
+                      placeholder={isAnalyzingProduct ? "Sedang membaca foto..." : "Deskripsi produk..."}
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white focus:border-[#00f2ea] outline-none min-h-[80px] resize-none" 
+                    />
+                  </div>
+
+                  {/* Styles */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-zinc-500 uppercase">3. Gaya Visual</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {styles.map(s => (
+                        <button key={s.id} onClick={() => setArtStyle(s.id)} className={`relative p-3 rounded-xl border text-left transition-all overflow-hidden group ${artStyle === s.id ? 'border-[#00f2ea] bg-zinc-900' : 'border-zinc-800 bg-zinc-950 hover:bg-zinc-900'}`}>
+                          <div className={`absolute top-0 right-0 w-12 h-12 bg-gradient-to-bl ${s.color} blur-xl opacity-20 group-hover:opacity-40`}></div>
+                          <div className="font-bold text-xs text-white relative z-10">{s.label}</div>
+                          <div className="text-[10px] text-zinc-500 mt-1 relative z-10 leading-tight">{s.desc}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <button onClick={handleGenerateImage} disabled={isGeneratingImg || (!prompt && !productImage)} className={`w-full py-4 rounded-xl font-bold text-black flex items-center justify-center gap-2 transition-all shadow-lg shadow-[#00f2ea]/20 ${isGeneratingImg ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed' : 'bg-gradient-to-r from-[#00f2ea] to-[#00c2ff] hover:scale-[1.02] active:scale-[0.98]'}`}>
+                    {isGeneratingImg ? <Loader2 className="animate-spin w-5 h-5"/> : <Sparkles className="w-5 h-5 fill-black"/>}
+                    {isGeneratingImg ? 'Sedang Meracik...' : 'Buat Konten Viral'}
+                  </button>
+
+                  {generatedImage && !isGeneratingImg && (
+                    <div className="grid grid-cols-2 gap-2 pt-4 border-t border-zinc-800">
+                       <button onClick={handleUpscale} className="flex items-center justify-center gap-2 py-3 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-emerald-500/50 rounded-lg text-xs font-medium text-zinc-300 transition-colors">
+                         {isUpscaling ? <Loader2 className="animate-spin w-3 h-3"/> : <ScanEye size={14}/>} HD Upscale
+                       </button>
+                       <button onClick={handleGenerateVideo} className="flex items-center justify-center gap-2 py-3 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-purple-500/50 rounded-lg text-xs font-medium text-zinc-300 transition-colors">
+                         <Video size={14}/> Buat Video
+                       </button>
+                       <button onClick={handleDownload} className="col-span-2 flex items-center justify-center gap-2 py-3 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-xs font-medium text-white transition-colors">
+                         <Download size={14}/> Download Hasil
+                       </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-6 animate-in slide-in-from-right-4 fade-in">
+                   {/* Script UI */}
+                   {generatedScript ? (
+                      <div className="space-y-4">
+                         {/* One-Click Copy All */}
+                         <button onClick={() => navigator.clipboard.writeText(`${generatedScript.hook}\n\n${typeof generatedScript.script_body === 'string' ? generatedScript.script_body : JSON.stringify(generatedScript.script_body)}\n\n${generatedScript.cta}\n\n${generatedScript.hashtags}`)} className="w-full py-2 bg-zinc-800 text-white rounded-lg text-xs flex items-center justify-center gap-2 hover:bg-zinc-700"><Copy size={14}/> Copy Semua (Caption)</button>
+                         
+                         <div className="group relative bg-zinc-900 border border-zinc-800 p-4 rounded-xl hover:border-[#ff0050]/50 transition-colors">
+                            <label className="text-[10px] font-bold text-[#ff0050] uppercase tracking-wider mb-1 block">Hook</label>
+                            <p className="text-sm font-medium text-white leading-relaxed">"{generatedScript.hook}"</p>
+                         </div>
+                         <div className="group relative bg-zinc-900 border border-zinc-800 p-4 rounded-xl hover:border-blue-500/50 transition-colors">
+                            <label className="text-[10px] font-bold text-blue-400 uppercase tracking-wider mb-1 block">Script</label>
+                            <p className="text-sm text-zinc-300 leading-relaxed whitespace-pre-wrap">{typeof generatedScript.script_body === 'string' ? generatedScript.script_body : JSON.stringify(generatedScript.script_body)}</p>
+                         </div>
+                         <div className="group relative bg-zinc-900 border border-zinc-800 p-4 rounded-xl hover:border-green-500/50 transition-colors">
+                            <label className="text-[10px] font-bold text-green-400 uppercase tracking-wider mb-1 block">Closing</label>
+                            <p className="text-sm font-bold text-white mb-2">{generatedScript.cta}</p>
+                            <p className="text-xs text-zinc-500 font-mono">{generatedScript.hashtags}</p>
+                         </div>
+                         
+                         <div className="pt-4 border-t border-zinc-800">
+                            {voiceUrl ? (
+                               <div className="bg-[#00f2ea]/10 border border-[#00f2ea]/30 p-3 rounded-xl flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                     <button onClick={handleAudioPlay} className="w-10 h-10 bg-[#00f2ea] text-black rounded-full flex items-center justify-center hover:scale-105 transition-transform">
+                                        {isAudioPlaying ? <Pause size={18} fill="black"/> : <Play size={18} fill="black"/>}
+                                     </button>
+                                     <div>
+                                        <div className="text-xs font-bold text-[#00f2ea]">AI Voice Ready</div>
+                                        <div className="text-[10px] text-zinc-400">Duration: ~15s</div>
+                                     </div>
+                                  </div>
+                                  <a href={voiceUrl} download="voiceover.wav" className="p-2 hover:bg-black/20 rounded-lg text-zinc-400 hover:text-white transition-colors"><Download size={18}/></a>
+                                </div>
+                            ) : (
+                               <button onClick={handleGenerateVoiceover} disabled={isGeneratingVoice} className="w-full py-3 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2">
+                                 {isGeneratingVoice ? <Loader2 size={16} className="animate-spin"/> : <Mic size={16}/>}
+                                 {isGeneratingVoice ? 'Sedang Merekam...' : 'Generate AI Voiceover'}
+                               </button>
+                            )}
+                         </div>
+                      </div>
+                   ) : (
+                      <div className="text-center py-10 px-4 border border-dashed border-zinc-800 rounded-xl">
+                         <Type className="w-10 h-10 text-zinc-700 mx-auto mb-2"/>
+                         <p className="text-sm text-zinc-500 mb-4">Belum ada script.</p>
+                         <button onClick={handleGenerateScript} className="px-6 py-3 bg-white text-black text-xs font-bold rounded-xl hover:bg-zinc-200">Buat Script Sekarang</button>
+                      </div>
+                   )}
+                </div>
+              )}
+           </div>
+        </div>
+      </div>
+      {error && <div className="absolute top-20 left-1/2 -translate-x-1/2 bg-red-500/90 text-white px-6 py-3 rounded-full text-sm font-medium shadow-xl animate-in slide-in-from-top-4 fade-in z-50 flex items-center gap-2"><MinusCircle size={16}/> {error}</div>}
+    </div>
+  );
+}
